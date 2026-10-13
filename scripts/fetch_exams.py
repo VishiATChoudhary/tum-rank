@@ -20,9 +20,15 @@ for m in re.finditer(r"Date:\s*(\d{4}-\d{2}-\d{2})\s*Module Number:\s*([A-Z0-9_]
     date, code, name, reg, att, absent, rest = m.groups()
     fail = re.search(r"failed:\s*([\d.]+)%", rest)
     avg = re.search(r"Average total:\s*([\d.]+)", rest)
+    # The distribution reads "<pct>% <count> K. <grade>": the grade label comes AFTER its
+    # own figures. The final entry is "<pct>% <count> K. 5.0 X Nicht erschienen", which is
+    # the no-show count rather than a grade, so the lookahead drops it.
+    dist = {}
+    for pct, cnt, grade in re.findall(r"([\d.]+)%\s*(\d+)\s*K\.\s*([1-5]\.\d)(?!\s*X)", rest):
+        dist[grade] = dist.get(grade, 0) + int(cnt)
     recs.append({"date": date, "code": code, "name": name.strip()[:80], "reg": int(reg), "att": int(att),
                  "absent": int(absent), "fail": float(fail[1]) if fail else None,
-                 "avg": float(avg[1]) if avg else None})
+                 "avg": float(avg[1]) if avg else None, "dist": dist})
 
 (ROOT / "data/vendor/exam_stats.json").write_text(json.dumps(recs, ensure_ascii=False))
 print(f"{len(recs)} exam sittings from stats.aamin.dev")

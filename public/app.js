@@ -270,7 +270,7 @@ async function openCourse(m) {
     info.prerequisites ? el('h3', { textContent: 'Before you take it' }) : null,
     info.prerequisites ? el('p', { className: 'prose', textContent: info.prerequisites }) : null,
     el('h3', { textContent: `What students say (${info.ratings.filter(r => r.comment).length})` }),
-    ...comments(info), ...digests(m), ...elsewhere(m)].filter(Boolean));
+    ...comments(info), ...gradeChart(m), ...digests(m), ...elsewhere(m)].filter(Boolean));
 }
 
 // Offering history, from TUMonline via Vuenc/TUM-Master-Informatics-Offered-Lectures (MIT). Facts, not opinions.
@@ -281,6 +281,25 @@ function offerLine(m) {
   return el('div', { className: 'offer' + (d ? ' stale' : '') },
     d ? `Not offered since ${o.last}. ` : '',
     `Ran in ${o.n} semester${o.n > 1 ? 's' : ''}, ${o.first} to ${o.last}.`);
+}
+
+// Real grade distribution for the module, drawn from published exam statistics.
+// It is labelled as exam grades, not as student ratings, and sits apart from the stars.
+const GRADES = ['1.0', '1.3', '1.7', '2.0', '2.3', '2.7', '3.0', '3.3', '3.7', '4.0', '4.3', '4.7', '5.0'];
+function gradeChart(m) {
+  const e = EXAMS[m.code];
+  if (!e || !e.dist || !Object.keys(e.dist).length) return [];
+  const max = Math.max(...Object.values(e.dist));
+  const total = Object.values(e.dist).reduce((a, b) => a + b, 0);
+  return [el('div', { className: 'grades' },
+    el('div', { className: 'gcap' }, `How ${total} candidates actually did`),
+    el('div', { className: 'gbars' }, ...GRADES.map(g => {
+      const n = e.dist[g] || 0;
+      return el('span', { className: 'gb' + (g === '5.0' ? ' fail' : ''), title: `${g}: ${n} candidate${n === 1 ? '' : 's'}` },
+        el('i', { style: `height:${max ? Math.max(2, n / max * 100) : 0}%` }), el('small', { textContent: g }));
+    })),
+    el('div', { className: 'gcap' }, `${e.fail}% failed · average ${e.avg ?? '—'} · `,
+      el('a', { href: 'https://stats.aamin.dev', target: '_blank', rel: 'noopener' }, 'TUM Exam Stats')))];
 }
 
 // Exam outcomes from TUM Exam Stats. Facts about how a cohort actually did, cited and
@@ -303,8 +322,7 @@ function examLine(m) {
 function digests(m) {
   const ds = DIGESTS[m.code] || [];
   if (!ds.length) return [];
-  return [el('h3', { textContent: 'Said elsewhere' }),
-    ...ds.map(d => el('div', { className: 'dig' },
+  return [...ds.map(d => el('div', { className: 'dig' },
       el('p', { textContent: d.summary }),
       el('a', { className: 'src', href: d.url, target: '_blank', rel: 'noopener nofollow ugc' },
         `Summarised from a ${d.src} thread${d.date ? `, ${d.date}` : ''}`)))];

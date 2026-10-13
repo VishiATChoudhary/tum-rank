@@ -88,6 +88,11 @@ reduces them to a weighted failure rate, candidate count and average grade per m
 **103 modules covered**. Every figure is credited to them with a link back, and the
 "Hardest exam" ordering is built from it.
 
+Course pages draw the full grade distribution (1.0 to 5.0) as a chart under "What students
+say", labelled as exam grades. The source lists each grade *after* its own figures, and ends
+with a `5.0 X Nicht erschienen` row that is the no-show count rather than a grade; both are
+handled in `fetch_exams.py`, and 332 of 352 distributions reconcile with the candidate count.
+
 These are exam facts, not ratings. They never touch the stars, the student difficulty votes
 or the "Top rated" ordering. If the author objects, delete `data/vendor/exam_stats.json`,
 re-run `build_exams.py`, and it is gone. Draft note to them: `docs/exam-stats-author.md`.
