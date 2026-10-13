@@ -314,7 +314,7 @@ document.querySelectorAll('.sort button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.sort button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
   renderTable();
 });
-const fitSelect = () => { const s = $('#degree'); const probe = el('span', { textContent: s.selectedOptions[0]?.textContent || '', style: 'position:absolute;visibility:hidden;white-space:nowrap;font:600 var(--text-lg)/1.1 var(--font-display);text-transform:uppercase' }); document.body.append(probe); s.style.width = `calc(${probe.offsetWidth}px + var(--space-lg))`; probe.remove(); };
+const fitSelect = () => { const s = $('#degree'); const probe = el('span', { textContent: s.selectedOptions[0]?.textContent || '', style: 'position:absolute;visibility:hidden;white-space:nowrap;font:600 var(--text-lg)/1.1 var(--font-display);text-transform:uppercase' }); document.body.append(probe); s.style.width = `calc(${probe.offsetWidth}px + var(--space-xl))`; probe.remove(); };
 $('#degree').onchange = e => { fitSelect(); loadDegree(e.target.value); };
 $('#adddeg').onclick = () => {
   const foot = $('.foot'); if ($('#impf')) return $('#impf input').focus();
