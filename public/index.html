@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TUM Rank · course ratings by students</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="style.css">
+
+<div class="oss">
+  <span>TUM Rank is open source and run by students.</span>
+  <a class="gh" href="https://github.com/VishiATChoudhary/tum-rank" target="_blank" rel="noopener">
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M8 .2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L8 12.6l-4.8 2.5.9-5.4L.2 5.9l5.4-.8z"/></svg>
+    Star on GitHub</a>
+  <span class="ask">Want something changed? <a href="https://github.com/VishiATChoudhary/tum-rank/issues/new/choose" target="_blank" rel="noopener">Open an issue</a> or <a href="https://github.com/VishiATChoudhary/tum-rank/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">send a PR</a>. Regular contributors become collaborators.</span>
+</div>
+<header class="mast">
+  <a class="mark" href="./">TUM&nbsp;Rank</a>
+  <label class="degree">
+    <span class="sr">Degree</span>
+    <select id="degree"></select>
+  </label>
+  <div class="find">
+    <input id="q" type="search" placeholder="Find a course" autocomplete="off" aria-label="Find a course" aria-controls="hits">
+    <kbd>⌘F</kbd>
+    <ul id="hits" role="listbox"></ul>
+  </div>
+</header>
+
+<main>
+  <section class="intro">
+    <h1 id="title">Courses, ranked by the people who sat them.</h1>
+    <p id="summary"></p>
+  </section>
+
+  <section class="areas" aria-labelledby="areas-h">
+    <div class="head">
+      <h2 id="areas-h">Areas</h2>
+      <p>Each bar is one course, sorted best to worst. Grey bars have no ratings yet.</p>
+    </div>
+    <div id="areas"></div>
+  </section>
+
+  <section class="table" aria-labelledby="table-h">
+    <div class="head">
+      <h2 id="table-h">All courses</h2>
+      <div class="sort" role="tablist" aria-label="Sort by">
+        <button role="tab" data-sort="rating" aria-selected="true">Top rated</button>
+        <button role="tab" data-sort="count" aria-selected="false">Most rated</button>
+        <button role="tab" data-sort="name" aria-selected="false">A–Z</button>
+      </div>
+    </div>
+    <ol id="rows"></ol>
+    <div id="suggest"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>Course data from TUMonline. Ratings are anonymous, text only, 200 characters. Rankings weight courses by how many people rated them.</span>
+  <button id="adddeg" class="link">Request another degree</button>
+</footer>
+
+<div id="scrim" hidden></div>
+<aside id="drawer" aria-hidden="true" tabindex="-1"></aside>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</html>

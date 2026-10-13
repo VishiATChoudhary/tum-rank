@@ -1,0 +1,33 @@
+name: Import degree
+# Started by a moderator approving a degree request (or by hand: gh workflow run import-degree.yml -f spo=4731)
+on:
+  workflow_dispatch:
+    inputs:
+      spo:
+        description: TUMonline curriculum number (pStpStpNr)
+        required: true
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Validate input
+        run: '[[ "${{ inputs.spo }}" =~ ^[0-9]{1,5}$ ]] || { echo "spo must be digits"; exit 1; }'
+      - name: Scrape tree
+        run: python3 scripts/scrape_spo.py "${{ inputs.spo }}"
+      - name: Sanity check
+        run: python3 -c "import json,sys; t=json.load(open('data/trees/${{ inputs.spo }}.json')); sys.exit(0 if t['count']>20 else 'tree looks empty')"
+      - name: Rebuild static data
+        run: python3 scripts/build_static.py
+      - name: Commit
+        run: |
+          git config user.name "tum-rank-bot"
+          git config user.email "tum-rank-bot@users.noreply.github.com"
+          git add data/trees public/data api/_keys.json
+          git commit -m "Import degree SPO ${{ inputs.spo }}" || echo "nothing to commit"
+          git push

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>TUM Rank · moderation</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=JetBrains+Mono&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="admin.css">
+<header class="mast"><a class="mark" href="./">TUM&nbsp;Rank</a><span class="degree">Moderation</span></header>
+<main class="mod">
+  <form id="login" class="mod-login">
+    <input id="tok" class="field" type="password" placeholder="Admin token" autocomplete="current-password" aria-label="Admin token">
+    <button class="btn primary">Unlock</button>
+  </form>
+  <section id="queue" hidden>
+    <div class="head"><h2>Suggestions</h2><button id="refresh" class="btn">Refresh</button></div>
+    <ol id="sug" class="mod-list"></ol>
+    <div class="head"><h2>Reported comments</h2></div>
+    <ol id="flag" class="mod-list"></ol>
+  </section>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="admin.js"></script>
+</html>

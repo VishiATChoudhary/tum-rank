@@ -1,0 +1,6 @@
+data/rank.db*
+__pycache__/
+.vercel
+.env*
+.playwright-mcp/
+.DS_Store
