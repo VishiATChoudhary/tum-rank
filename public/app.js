@@ -19,8 +19,11 @@ const score = m => m.n ? (m.avg * m.n + PRIOR * PRIOR_N) / (m.n + PRIOR_N) : -1;
 const tier = a => 'r' + Math.min(5, Math.max(1, Math.round(a)));
 const PLACEHOLDER = /anerkennung|recognition|platzhalter|placeholder/i;
 
-let LINKS = {};
+let LINKS = {}, OFF = {}, NEWEST = 0;
 getJSON('/data/links.json').then(d => { LINKS = d; }).catch(() => {});
+const offReady = getJSON('/data/offerings.json').then(d => { OFF = d; NEWEST = Math.max(0, ...Object.values(d).map(o => o.lastKey)); }).catch(() => {});
+// a module is "dormant" if it has history but has not run in the last ~2 years
+const dormant = code => { const o = OFF[code]; return o && NEWEST && o.lastKey < NEWEST - 20 ? o : null; };
 const state = { spo: null, degrees: [], mods: [], areas: [], area: null, sort: 'rating', diff: 'any', limit: 60, open: null };
 // difficulty bands on the 1-5 average
 const DIFF = { any: () => true, easy: d => d != null && d < 2.5, medium: d => d != null && d >= 2.5 && d < 3.5, hard: d => d != null && d >= 3.5 };
@@ -77,6 +80,7 @@ function build(tree, stats, extra) {
 
 async function loadDegree(spo, keepArea) {
   state.spo = +spo;
+  await offReady;
   const [tree, stats, extra] = await Promise.all([getJSON(`/data/trees/${spo}.json`), api('stats'), api('extra?spo=' + spo).catch(() => [])]);
   build(tree, stats, extra);
   if (!keepArea) { state.area = null; state.limit = 60; }
@@ -154,7 +158,8 @@ function renderTable() {
     },
       el('span', { className: 'rk', textContent: r ?? '' }),
       el('span', { className: 'cd', textContent: m.code || 'added' }),
-      el('span', { className: 'nm' }, el('b', { textContent: m.name, title: m.name }), el('small', { textContent: m.area.name })),
+      el('span', { className: 'nm' }, el('b', { textContent: m.name, title: m.name }),
+        el('small', {}, m.area.name, dormant(m.code) ? el('i', { className: 'stale', textContent: ` · last offered ${dormant(m.code).last}` }) : null)),
       el('span', { className: 'ec', textContent: m.ects ? `${m.ects} ECTS` : '' }),
       el('span', { className: 'df' + (m.diff == null ? ' none' : ''), title: m.diff == null ? 'No difficulty votes yet' : `Difficulty ${fmt(m.diff)} of 5` }, m.diff == null ? '—' : diffWord(m.diff), m.diff == null ? null : el('small', { textContent: fmt(m.diff) })),
       meter(m.avg),
@@ -243,6 +248,7 @@ async function openCourse(m) {
     el('div', { className: 'code', textContent: [m.code || 'Added by students', m.ects ? `${m.ects} ECTS` : null].filter(Boolean).join(' · ') }),
     el('h2', { textContent: info.name }),
     el('div', { className: 'where', textContent: m.area.name }),
+    offerLine(m),
     el('div', { className: 'score' },
       el('div', { className: 'big' }, fmt(info.avg), el('small', { textContent: info.n ? `${info.n} rating${info.n > 1 ? 's' : ''}` : 'not rated yet' }),
         el('span', { className: 'dif', textContent: info.difficulty != null ? `${diffWord(info.difficulty)} · ${fmt(info.difficulty)}/5 difficulty` : 'No difficulty votes' })),
@@ -256,6 +262,16 @@ async function openCourse(m) {
     info.prerequisites ? el('p', { className: 'prose', textContent: info.prerequisites }) : null,
     el('h3', { textContent: `What students say (${info.ratings.filter(r => r.comment).length})` }),
     ...comments(info), ...elsewhere(m)].filter(Boolean));
+}
+
+// Offering history, from TUMonline via Vuenc/TUM-Master-Informatics-Offered-Lectures (MIT). Facts, not opinions.
+function offerLine(m) {
+  const o = OFF[m.code];
+  if (!o) return null;
+  const d = dormant(m.code);
+  return el('div', { className: 'offer' + (d ? ' stale' : '') },
+    d ? `Not offered since ${o.last}. ` : '',
+    `Ran in ${o.n} semester${o.n > 1 ? 's' : ''}, ${o.first} to ${o.last}.`);
 }
 
 // Discussions on other sites. We deep-link only: their text stays on their site.

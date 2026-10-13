@@ -20,6 +20,15 @@ DATABASE_URL=postgresql:///tumrank ADMIN_TOKEN=$(openssl rand -hex 16) python3 s
 # open http://localhost:8090
 ```
 
+## Offering history
+
+`data/vendor/all_offered_courses_*.json` come from
+[Vuenc/TUM-Master-Informatics-Offered-Lectures](https://github.com/Vuenc/TUM-Master-Informatics-Offered-Lectures)
+(MIT, Vincent Bürgin), scraped from TUMonline. `scripts/build_offerings.py` reduces them to
+per-module facts: how many semesters a module ran, and the first and last one. Courses that
+have not run for about two years are flagged, which saves students planning around a dead
+module. Covers 299 of 803 lecture-type courses.
+
 ## Course discussions elsewhere
 
 `data/links.tsv` holds deep links to places where a course is discussed (Reddit threads, blog posts).

@@ -3,7 +3,7 @@
 Env: DATABASE_URL (Postgres), ADMIN_TOKEN (>= 24 chars), IP_SALT (random secret),
      optional GH_TOKEN + GH_REPO to trigger the degree-import workflow on approval.
 """
-import hashlib, hmac, json, os, re, secrets, unicodedata, urllib.request
+import hashlib, hmac, json, os, re, secrets, threading, unicodedata, urllib.request
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
@@ -36,11 +36,15 @@ ALTER TABLE ratings ADD COLUMN IF NOT EXISTS difficulty SMALLINT CHECK (difficul
 ALTER TABLE ratings ADD COLUMN IF NOT EXISTS comment_status TEXT NOT NULL DEFAULT 'live';
 """
 _conn = None
+_conn_lock = threading.Lock()
 def db():
     global _conn
     if _conn is None or _conn.closed:
-        _conn = psycopg.connect(os.environ["DATABASE_URL"], autocommit=True, row_factory=dict_row, prepare_threshold=None)
-        _conn.execute(SCHEMA)
+        with _conn_lock:  # concurrent requests must not both build the connection / run SCHEMA
+            if _conn is None or _conn.closed:
+                c = psycopg.connect(os.environ["DATABASE_URL"], autocommit=True, row_factory=dict_row, prepare_threshold=None)
+                c.execute(SCHEMA)
+                _conn = c
     return _conn
 
 # ---------------- anti-abuse ----------------
