@@ -7,7 +7,7 @@ import hashlib, hmac, json, os, re, secrets, unicodedata, urllib.request
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 import psycopg
 from psycopg.rows import dict_row
@@ -80,6 +80,16 @@ def hit(iph, *kinds):
 # ---------------- handler ----------------
 class handler(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
+
+    def parse_request(self):
+        # Vercel rewrites /api/<route> to /api/index?__route=<route>; restore the original path
+        ok = super().parse_request()
+        if ok and self.path.startswith("/api/index"):
+            u = urlparse(self.path); q = parse_qs(u.query, keep_blank_values=True)
+            route = q.pop("__route", [""])[0]
+            rest = urlencode([(k, v) for k, vs in q.items() for v in vs])
+            self.path = "/api/" + route + ("?" + rest if rest else "")
+        return ok
 
     def ip(self):
         if LOCAL: return self.client_address[0]
