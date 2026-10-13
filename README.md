@@ -2,7 +2,7 @@
 
 Course ratings for TU Munich, by students. Pick your degree, see every course grouped by area, rate the course and the professor (1 to 5 stars), and leave a short text comment.
 
-**Live:** https://tum-rank.vercel.app · **Contribute:** see [CONTRIBUTING.md](CONTRIBUTING.md)
+**Live:** https://tum-rank-one.vercel.app · **Contribute:** see [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## How it works
 
