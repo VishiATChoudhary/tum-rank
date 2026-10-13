@@ -294,12 +294,12 @@ function digests(m) {
 // Search links beat a curated thread list: they never 404, never go stale, and cover
 // every course rather than the handful somebody happened to post about.
 function searchLinks(m) {
-  const q = encodeURIComponent(m.code ? `${m.code} OR "${m.name}"` : m.name);
+  const q = encodeURIComponent(m.code || m.name);
   return [
     { url: `https://www.reddit.com/r/tumunich/search/?q=${q}&restrict_sr=1&sort=relevance`,
       title: `Search r/tumunich for ${m.code || m.name}`, src: 'reddit.com' },
-    { url: `https://www.studydrive.net/de/search?q=${encodeURIComponent(m.code || m.name)}`,
-      title: 'Find notes and old exams on Studydrive', src: 'studydrive.net' },
+    { url: 'https://www.studydrive.net/de/uni/technische-universitat-munchen-tum/1058',
+      title: 'Browse TUM notes and old exams on Studydrive', src: 'studydrive.net' },
     { url: 'https://stats.aamin.dev', title: 'Look up exam pass rates on TUM Exam Stats', src: 'stats.aamin.dev' },
   ];
 }

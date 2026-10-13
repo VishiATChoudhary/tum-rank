@@ -42,11 +42,17 @@ so these stay summaries rather than reposted comments.
 
 ## Course discussions elsewhere
 
-Every course page carries search links to r/tumunich and Studydrive, generated from the module
-code. Search links never 404, never go stale, and cover every course, unlike a curated thread
-list that covers a few dozen and rots.
+Every course page carries a r/tumunich search link as a fallback. Studydrive is linked at
+university level, not per course: their search ignores the query (searching `IN2064` returns
+"Finanzmathematik" and claims 1.6 M results), so a per-course search link there is a dead end.
 
-`data/links.tsv` additionally holds *verified* deep links to specific threads;
+`scripts/scan_reddit.py` pages the whole r/tumunich archive once (10,754 posts back to 2017,
+cached in `data/vendor/`) and writes `data/links.tsv` from posts that actually mention a module
+code. It matches on codes only: course names like "Machine Learning" also match "PhD in Machine
+Learning" and tell a student nothing. Threads named after the module outrank passing mentions,
+and posts with no replies are skipped because there is nothing to read.
+
+`data/links.tsv` holds the resulting deep links to specific threads;
 `python3 scripts/build_links.py` validates them into `public/data/links.json`, and
 `scripts/verify_links.py` re-checks that each one still resolves. Note that Reddit cannot be
 verified programmatically (it returns an identical HTTP 200 for a nonexistent thread id), so
