@@ -86,7 +86,9 @@ python3 scripts/build_static.py         # regenerate public/data and api/_keys.j
 `scripts/fetch_exams.py` parses the figures their front page serves and `scripts/build_exams.py`
 reduces them to a weighted failure rate, candidate count and average grade per module:
 **103 modules covered**. Every figure is credited to them with a link back, and the
-"Hardest exam" ordering is built from it.
+"Hardest exam" ordering is built from it. Choosing that ordering also recolours the Areas
+panel: each bar becomes a course shaded by its failure rate, and each area shows its
+candidate-weighted failure rate, so the panel is not dead while there are no ratings yet.
 
 Course pages draw the full grade distribution (1.0 to 5.0) as a chart under "What students
 say", labelled as exam grades. The source lists each grade *after* its own figures, and ends

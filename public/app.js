@@ -69,6 +69,10 @@ function build(tree, stats, extra) {
     const w = rated.reduce((s, m) => s + m.n, 0);
     a.avg = w ? rated.reduce((s, m) => s + m.avg * m.n, 0) / w : null;
     a.rated = rated.length;
+    const ex = a.mods.map(m => EXAMS[m.code]).filter(Boolean);
+    a.withExam = ex.length;
+    const sat = ex.reduce((s, e) => s + e.sat, 0);
+    a.failAvg = sat ? ex.reduce((s, e) => s + e.fail * e.sat, 0) / sat : null;   // weighted by candidates
   }
   state.mods = [...seen.values()];
   // order: elective catalogues first, then single-module essentials, then non-CS catalogues
@@ -103,7 +107,18 @@ function render() {
   renderAreas(); renderTable();
 }
 
+// Difficulty from published exam outcomes, mapped onto a 1-5 feel so these bars stay
+// readable next to the rating bars: 0% failed reads as 1, 50%+ as 5.
+const failTier = f => 'f' + Math.min(5, Math.max(1, Math.round(f / 12.5) + 1));
 function bars(mods) {
+  if (state.sort === 'exam') {
+    const byFail = [...mods].sort((a, b) => (EXAMS[b.code]?.fail ?? -1) - (EXAMS[a.code]?.fail ?? -1));
+    return el('span', { className: 'bars', aria: { hidden: 'true' } }, ...byFail.slice(0, 140).map(m => {
+      const e = EXAMS[m.code];
+      return el('i', e ? { className: failTier(e.fail), style: `height:${25 + Math.min(e.fail, 60) / 60 * 75}%`, title: `${m.code}: ${e.fail}% failed` }
+                       : { className: 'u' });
+    }));
+  }
   const sorted = [...mods].sort((a, b) => score(b) - score(a));
   return el('span', { className: 'bars', aria: { hidden: 'true' } }, ...sorted.slice(0, 140).map(m =>
     el('i', m.avg != null ? { className: tier(m.avg), style: `height:${20 + m.avg * 16}%` } : { className: 'u' })));
@@ -119,9 +134,14 @@ function renderAreas() {
       className: 'area', aria: { pressed: String(state.area === a) },
       onclick: () => { state.area = state.area === a ? null : a; state.limit = 60; syncUrl(); renderAreas(); renderTable(); toListTop(); },
     },
-      el('span', { className: 'nm', title: a.name }, el('span', { className: 't', textContent: a.name }), el('small', { textContent: `${a.mods.length} course${a.mods.length === 1 ? '' : 's'} · ${a.rated} rated` })),
+      el('span', { className: 'nm', title: a.name }, el('span', { className: 't', textContent: a.name }),
+        el('small', { textContent: state.sort === 'exam'
+          ? `${a.mods.length} course${a.mods.length === 1 ? '' : 's'} \u00b7 ${a.withExam} with exam data`
+          : `${a.mods.length} course${a.mods.length === 1 ? '' : 's'} \u00b7 ${a.rated} rated` })),
       bars(a.mods),
-      el('span', { className: 'avg' + (a.avg == null ? ' none' : ''), textContent: fmt(a.avg) })));
+      state.sort === 'exam'
+        ? el('span', { className: 'avg' + (a.failAvg == null ? ' none' : ''), textContent: a.failAvg == null ? '\u2014' : `${Math.round(a.failAvg)}%` })
+        : el('span', { className: 'avg' + (a.avg == null ? ' none' : ''), textContent: fmt(a.avg) })));
   }
 }
 // show the first row of the list: side-by-side layout only scrolls up if we're past the list start; stacked layout jumps to the list
@@ -427,7 +447,11 @@ if (!/Mac|iPhone|iPad/.test(navigator.platform)) $('.find kbd').textContent = 'C
 document.querySelectorAll('.sort button').forEach(b => b.onclick = () => {
   state.sort = b.dataset.sort;
   document.querySelectorAll('.sort button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
-  renderTable();
+  const note = $('#areas-note');
+  if (note) note.textContent = state.sort === 'exam'
+    ? 'Each bar is one course, hardest exam first. Colour is the share who failed. Grey means no exam data.'
+    : 'Each bar is one course, sorted best to worst. Grey bars have no ratings yet.';
+  renderAreas(); renderTable();
 });
 const fitSelect = () => { const s = $('#degree'); const probe = el('span', { textContent: s.selectedOptions[0]?.textContent || '', style: 'position:absolute;visibility:hidden;white-space:nowrap;font:600 var(--text-lg)/1.1 var(--font-display);text-transform:uppercase' }); document.body.append(probe); s.style.width = `calc(${probe.offsetWidth}px + var(--space-xl))`; probe.remove(); };
 document.querySelectorAll('.diff button').forEach(b => b.onclick = () => {

@@ -103,6 +103,9 @@ main { padding: 0 clamp(var(--space-sm), 3vw, var(--space-2xl)) var(--space-2xl)
 .bars { display: flex; align-items: flex-end; gap: 2px; height: 34px; min-width: 0; overflow: hidden; }
 .bars i { flex: 1 1 0; min-width: 2px; max-width: 10px; border-radius: 1px; }
 .bars i.u { background: var(--color-unrated); height: 30%; }
+.f1 { background: oklch(80% 0.09 150); } .f2 { background: oklch(78% 0.11 95); }
+.f3 { background: oklch(75% 0.13 70); } .f4 { background: oklch(65% 0.16 40); }
+.f5 { background: oklch(52% 0.17 28); }
 .r1 { background: var(--color-r1); } .r2 { background: var(--color-r2); } .r3 { background: var(--color-r3); } .r4 { background: var(--color-r4); } .r5 { background: var(--color-r5); }
 .area .avg { font: 700 var(--text-xl)/1 var(--font-display); text-align: right; font-variant-numeric: tabular-nums; }
 .area .avg.none { color: var(--color-ink-3); font-weight: 500; font-size: var(--text-lg); }
