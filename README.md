@@ -29,6 +29,17 @@ per-module facts: how many semesters a module ran, and the first and last one. C
 have not run for about two years are flagged, which saves students planning around a dead
 module. Covers 299 of 803 lecture-type courses.
 
+## Summaries of public discussion
+
+`data/digests.tsv` holds short summaries, written in our own words, of what public threads say
+about a course; `python3 scripts/build_digests.py` validates and builds them. They appear in
+their own "Said elsewhere" block with a link to the source.
+
+**They never touch the ratings.** A forum thread has no star value, so giving it one would make
+the averages, the difficulty figures and the ranking fiction. The stars come only from people
+who rated on this site. The build step rejects any summary containing a long verbatim quote,
+so these stay summaries rather than reposted comments.
+
 ## Course discussions elsewhere
 
 Every course page carries search links to r/tumunich and Studydrive, generated from the module
@@ -62,5 +73,12 @@ python3 scripts/build_static.py         # regenerate public/data and api/_keys.j
 | `ADMIN_TOKEN` | Moderator token, 24+ random characters |
 | `IP_SALT` | Random secret used to hash IP addresses (raw IPs are never stored) |
 | `GH_TOKEN`, `GH_REPO` | Optional. Fine-grained token with Actions: write, so approving a degree starts the import |
+
+## Exam pass rates
+
+[stats.aamin.dev](https://stats.aamin.dev) publishes TUM exam statistics (registrations,
+attempts, no-shows, pass rates) per module per semester. Each course links out to it. We do
+not copy it: it is someone else's database, and their search backend is currently offline.
+Worth approaching the author about combining forces.
 
 See [SECURITY.md](SECURITY.md) for the abuse model.

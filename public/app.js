@@ -19,8 +19,9 @@ const score = m => m.n ? (m.avg * m.n + PRIOR * PRIOR_N) / (m.n + PRIOR_N) : -1;
 const tier = a => 'r' + Math.min(5, Math.max(1, Math.round(a)));
 const PLACEHOLDER = /anerkennung|recognition|platzhalter|placeholder/i;
 
-let LINKS = {}, OFF = {}, NEWEST = 0;
+let LINKS = {}, DIGESTS = {}, OFF = {}, NEWEST = 0;
 getJSON('/data/links.json').then(d => { LINKS = d; }).catch(() => {});
+getJSON('/data/digests.json').then(d => { DIGESTS = d; }).catch(() => {});
 const offReady = getJSON('/data/offerings.json').then(d => { OFF = d; NEWEST = Math.max(0, ...Object.values(d).map(o => o.lastKey)); }).catch(() => {});
 // a module is "dormant" if it has history but has not run in the last ~2 years
 const dormant = code => { const o = OFF[code]; return o && NEWEST && o.lastKey < NEWEST - 20 ? o : null; };
@@ -263,7 +264,7 @@ async function openCourse(m) {
     info.prerequisites ? el('h3', { textContent: 'Before you take it' }) : null,
     info.prerequisites ? el('p', { className: 'prose', textContent: info.prerequisites }) : null,
     el('h3', { textContent: `What students say (${info.ratings.filter(r => r.comment).length})` }),
-    ...comments(info), ...elsewhere(m)].filter(Boolean));
+    ...comments(info), ...digests(m), ...elsewhere(m)].filter(Boolean));
 }
 
 // Offering history, from TUMonline via Vuenc/TUM-Master-Informatics-Offered-Lectures (MIT). Facts, not opinions.
@@ -276,6 +277,19 @@ function offerLine(m) {
     `Ran in ${o.n} semester${o.n > 1 ? 's' : ''}, ${o.first} to ${o.last}.`);
 }
 
+// Summaries of public discussion, in our own words, each linked to its source.
+// Deliberately kept out of the ratings: a forum thread has no star value, and inventing
+// one would make the averages and the ranking fiction.
+function digests(m) {
+  const ds = DIGESTS[m.code] || [];
+  if (!ds.length) return [];
+  return [el('h3', { textContent: 'Said elsewhere' }),
+    ...ds.map(d => el('div', { className: 'dig' },
+      el('p', { textContent: d.summary }),
+      el('a', { className: 'src', href: d.url, target: '_blank', rel: 'noopener nofollow ugc' },
+        `Summarised from a ${d.src} thread${d.date ? `, ${d.date}` : ''}`)))];
+}
+
 // Discussions on other sites. We deep-link only: their text stays on their site.
 // Search links beat a curated thread list: they never 404, never go stale, and cover
 // every course rather than the handful somebody happened to post about.
@@ -286,6 +300,7 @@ function searchLinks(m) {
       title: `Search r/tumunich for ${m.code || m.name}`, src: 'reddit.com' },
     { url: `https://www.studydrive.net/de/search?q=${encodeURIComponent(m.code || m.name)}`,
       title: 'Find notes and old exams on Studydrive', src: 'studydrive.net' },
+    { url: 'https://stats.aamin.dev', title: 'Look up exam pass rates on TUM Exam Stats', src: 'stats.aamin.dev' },
   ];
 }
 function elsewhere(m) {

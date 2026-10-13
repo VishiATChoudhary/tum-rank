@@ -222,6 +222,14 @@ main { padding: 0 clamp(var(--space-sm), 3vw, var(--space-2xl)) var(--space-2xl)
 .rate textarea { width: 100%; resize: vertical; min-height: 4.5rem; }
 .rate .meta { display: flex; justify-content: space-between; align-items: center; gap: var(--space-sm); font-size: var(--text-xs); color: var(--color-ink-3); }
 .rate .err { color: var(--color-error); font-size: var(--text-sm); min-height: 1.2em; margin: 0; }
+#drawer .dig {
+  border-left: 3px solid var(--color-rule-2); padding: var(--space-2xs) 0 var(--space-2xs) var(--space-sm);
+  margin-bottom: var(--space-xs); background: var(--color-paper-2);
+}
+#drawer .dig p { font-size: var(--text-sm); margin: 0 0 var(--space-3xs); }
+#drawer .dig .src { font-size: var(--text-xs); color: var(--color-ink-3); text-underline-offset: 3px; }
+#drawer .dig .src:hover { color: var(--color-accent); }
+#drawer .dig .src::after { content: " \2197"; }
 #drawer .offer { margin-top: var(--space-2xs); font-size: var(--text-sm); color: var(--color-ink-2); }
 #drawer .offer.stale { color: var(--color-error); }
 .row .nm .stale { font-style: normal; color: var(--color-error); }
