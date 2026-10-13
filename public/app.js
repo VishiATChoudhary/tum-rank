@@ -19,6 +19,8 @@ const score = m => m.n ? (m.avg * m.n + PRIOR * PRIOR_N) / (m.n + PRIOR_N) : -1;
 const tier = a => 'r' + Math.min(5, Math.max(1, Math.round(a)));
 const PLACEHOLDER = /anerkennung|recognition|platzhalter|placeholder/i;
 
+let LINKS = {};
+getJSON('/data/links.json').then(d => { LINKS = d; }).catch(() => {});
 const state = { spo: null, degrees: [], mods: [], areas: [], area: null, sort: 'rating', diff: 'any', limit: 60, open: null };
 // difficulty bands on the 1-5 average
 const DIFF = { any: () => true, easy: d => d != null && d < 2.5, medium: d => d != null && d >= 2.5 && d < 3.5, hard: d => d != null && d >= 3.5 };
@@ -253,9 +255,18 @@ async function openCourse(m) {
     info.prerequisites ? el('h3', { textContent: 'Before you take it' }) : null,
     info.prerequisites ? el('p', { className: 'prose', textContent: info.prerequisites }) : null,
     el('h3', { textContent: `What students say (${info.ratings.filter(r => r.comment).length})` }),
-    ...comments(info)].filter(Boolean));
+    ...comments(info), ...elsewhere(m)].filter(Boolean));
 }
 
+// Discussions on other sites. We deep-link only: their text stays on their site.
+function elsewhere(m) {
+  const ls = LINKS[m.code] || [];
+  if (!ls.length) return [];
+  return [el('h3', { textContent: 'Discussed elsewhere' }),
+    el('p', { className: 'where', textContent: 'Found on other sites. Opinions there are not part of the ratings above.' }),
+    ...ls.map(l => el('a', { className: 'out', href: l.url, target: '_blank', rel: 'noopener nofollow ugc' },
+      el('span', { textContent: l.title }), el('small', { textContent: [l.src, l.date].filter(Boolean).join(' · ') })))];
+}
 function comments(info) {
   const list = info.ratings.filter(r => r.comment);
   if (!list.length) return [el('p', { className: 'where', textContent: 'No comments yet. Be the first.' })];

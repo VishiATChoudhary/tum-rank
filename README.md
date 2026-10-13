@@ -20,6 +20,16 @@ DATABASE_URL=postgresql:///tumrank ADMIN_TOKEN=$(openssl rand -hex 16) python3 s
 # open http://localhost:8090
 ```
 
+## Course discussions elsewhere
+
+`data/links.tsv` holds deep links to places where a course is discussed (Reddit threads, blog posts).
+`python3 scripts/build_links.py` validates them and writes `public/data/links.json`.
+
+**We link, we never copy.** Review text from other sites is copyrighted by its authors, and
+republishing criticism of a named lecturer would make this site the publisher under German
+personality rights. Third-party opinions are never imported as ratings: the stars and the
+difficulty averages come only from people who rated here.
+
 ## Data
 
 ```bash
