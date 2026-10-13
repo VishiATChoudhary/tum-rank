@@ -131,6 +131,7 @@ main { padding: 0 clamp(var(--space-sm), 3vw, var(--space-2xl)) var(--space-2xl)
 .row .df { font: 600 var(--text-sm)/1 var(--font-display); text-transform: uppercase; letter-spacing: 0.03em; text-align: right; white-space: nowrap; }
 .row .df small { display: block; font: 400 var(--text-2xs)/1.4 var(--font-body); text-transform: none; color: var(--color-ink-3); }
 .row .df.none { color: var(--color-ink-3); font-weight: 500; }
+.score .dif small { display: block; font: 400 var(--text-2xs)/1.4 var(--font-body); text-transform: none; letter-spacing: 0; color: var(--color-ink-3); margin-top: 2px; }
 .score .dif { display: block; font: 600 var(--text-xs)/1.4 var(--font-display); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink-2); margin-top: var(--space-2xs); }
 .diffpick { display: inline-flex; gap: 4px; }
 .diffpick button {

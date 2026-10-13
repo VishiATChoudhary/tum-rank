@@ -80,6 +80,21 @@ python3 scripts/build_static.py         # regenerate public/data and api/_keys.j
 | `IP_SALT` | Random secret used to hash IP addresses (raw IPs are never stored) |
 | `GH_TOKEN`, `GH_REPO` | Optional. Fine-grained token with Actions: write, so approving a degree starts the import |
 
+## Difficulty score
+
+One 1-5 number per course, shown in the table, the Areas bars and the course page.
+
+    difficulty = (exam_prior * 4 + student_mean * votes) / (4 + votes)
+
+The prior maps the published exam failure rate onto the same scale (0% failed is 1, 50%+
+is 5) and is worth four student votes, so a course starts out scored by how its cohort
+actually did and shifts to what students say as they vote. With no exam data it is the
+student mean alone; with neither it stays unscored rather than guessing. The course page
+always states which inputs produced the number.
+
+Expired courses (not offered for about two years) sort to the bottom in every ordering,
+and areas are ordered best-first, or hardest-first while the difficulty ordering is on.
+
 ## Exam outcomes
 
 [TUM Exam Stats](https://stats.aamin.dev) publishes TUM exam statistics per module per sitting.

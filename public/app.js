@@ -16,7 +16,28 @@ const fmt = x => x == null ? '—' : x.toFixed(1);
 // Bayesian average: pulls courses with few ratings toward 3.0 so one 5-star can't top the table
 const PRIOR_N = 3, PRIOR = 3;
 const score = m => m.n ? (m.avg * m.n + PRIOR * PRIOR_N) / (m.n + PRIOR_N) : -1;
+
+// ---------- difficulty ----------
+// One 1-5 number per course. It starts from the published exam failure rate, which is a
+// fact about how a real cohort did, and student votes take it over as they arrive: the
+// exam prior is worth EXAM_WEIGHT votes, so after a handful of ratings the students decide.
+const EXAM_WEIGHT = 4;
+const failToScore = f => 1 + Math.min(f, 50) / 50 * 4;      // 0% failed -> 1, 50%+ -> 5
+function difficulty(m) {
+  const e = EXAMS[m.code];
+  const prior = e ? failToScore(e.fail) : null;
+  const votes = m.diffN || 0;
+  if (!votes) return prior == null ? null : { score: prior, votes: 0, from: 'exam', fail: e.fail };
+  if (prior == null) return { score: m.diff, votes, from: 'students' };
+  // while an exam prior is in the mix the label must say so, however many votes there are
+  return { score: (prior * EXAM_WEIGHT + m.diff * votes) / (EXAM_WEIGHT + votes),
+           votes, from: 'both', fail: e.fail };
+}
+const diffScore = m => difficulty(m)?.score ?? null;
+// expired courses sort last everywhere, whatever the metric
+const expired = m => (dormant(m.code) ? 1 : 0);
 const tier = a => 'r' + Math.min(5, Math.max(1, Math.round(a)));
+const dTier = d => 'f' + Math.min(5, Math.max(1, Math.round(d)));
 const PLACEHOLDER = /anerkennung|recognition|platzhalter|placeholder/i;
 
 let LINKS = {}, DIGESTS = {}, EXAMS = {}, OFF = {}, NEWEST = 0;
@@ -55,7 +76,7 @@ function build(tree, stats, extra) {
       if (!a) areas.set(area.id, a = { id: area.id, name: area.name, group: group.name, mods: [], keys: new Set() });
       if (a.keys.has(n.key)) return;
       a.keys.add(n.key);
-      const m = { key: n.key, code: n.code, name: n.name, ects: n.ects, avg: n.avg ?? null, n: n.n || 0, dist: n.dist, pavg: n.pavg, diff: n.diff ?? null, area: a, user: n.user };
+      const m = { key: n.key, code: n.code, name: n.name, ects: n.ects, avg: n.avg ?? null, n: n.n || 0, dist: n.dist, pavg: n.pavg, diff: n.diff ?? null, diffN: n.diffN || 0, area: a, user: n.user };
       a.mods.push(m); mods.push(m);
       return;
     }
@@ -69,10 +90,9 @@ function build(tree, stats, extra) {
     const w = rated.reduce((s, m) => s + m.n, 0);
     a.avg = w ? rated.reduce((s, m) => s + m.avg * m.n, 0) / w : null;
     a.rated = rated.length;
-    const ex = a.mods.map(m => EXAMS[m.code]).filter(Boolean);
-    a.withExam = ex.length;
-    const sat = ex.reduce((s, e) => s + e.sat, 0);
-    a.failAvg = sat ? ex.reduce((s, e) => s + e.fail * e.sat, 0) / sat : null;   // weighted by candidates
+    const ds = a.mods.map(difficulty).filter(Boolean);
+    a.scored = ds.length;
+    a.hardAvg = ds.length ? ds.reduce((s, d) => s + d.score, 0) / ds.length : null;
   }
   state.mods = [...seen.values()];
   // order: elective catalogues first, then single-module essentials, then non-CS catalogues
@@ -82,6 +102,7 @@ function build(tree, stats, extra) {
   const rank = a => /überfachlich|sprach|linde|soft skill|general education/i.test(a.group + ' ' + a.name) ? 2 : a.group === 'Program essentials' ? 1 : 0;
   all.forEach(a => a.rank = rank(a));
   state.areas = all.map((a, i) => [a, i]).sort((x, y) => rank(x[0]) - rank(y[0]) || x[1] - y[1]).map(x => x[0]);
+  orderAreas();
 }
 
 async function loadDegree(spo, keepArea) {
@@ -112,10 +133,11 @@ function render() {
 const failTier = f => 'f' + Math.min(5, Math.max(1, Math.round(f / 12.5) + 1));
 function bars(mods) {
   if (state.sort === 'exam') {
-    const byFail = [...mods].sort((a, b) => (EXAMS[b.code]?.fail ?? -1) - (EXAMS[a.code]?.fail ?? -1));
-    return el('span', { className: 'bars', aria: { hidden: 'true' } }, ...byFail.slice(0, 140).map(m => {
-      const e = EXAMS[m.code];
-      return el('i', e ? { className: failTier(e.fail), style: `height:${25 + Math.min(e.fail, 60) / 60 * 75}%`, title: `${m.code}: ${e.fail}% failed` }
+    const byHard = [...mods].sort((a, b) => expired(a) - expired(b) || (diffScore(b) ?? -1) - (diffScore(a) ?? -1));
+    return el('span', { className: 'bars', aria: { hidden: 'true' } }, ...byHard.slice(0, 140).map(m => {
+      const d = difficulty(m);
+      return el('i', d ? { className: dTier(d.score), style: `height:${20 + d.score * 16}%`,
+                           title: `${m.code}: difficulty ${d.score.toFixed(1)} of 5 (${d.from})` }
                        : { className: 'u' });
     }));
   }
@@ -136,11 +158,11 @@ function renderAreas() {
     },
       el('span', { className: 'nm', title: a.name }, el('span', { className: 't', textContent: a.name }),
         el('small', { textContent: state.sort === 'exam'
-          ? `${a.mods.length} course${a.mods.length === 1 ? '' : 's'} \u00b7 ${a.withExam} with exam data`
+          ? `${a.mods.length} course${a.mods.length === 1 ? '' : 's'} \u00b7 ${a.scored} scored`
           : `${a.mods.length} course${a.mods.length === 1 ? '' : 's'} \u00b7 ${a.rated} rated` })),
       bars(a.mods),
       state.sort === 'exam'
-        ? el('span', { className: 'avg' + (a.failAvg == null ? ' none' : ''), textContent: a.failAvg == null ? '\u2014' : `${Math.round(a.failAvg)}%` })
+        ? el('span', { className: 'avg' + (a.hardAvg == null ? ' none' : ''), textContent: fmt(a.hardAvg) })
         : el('span', { className: 'avg' + (a.avg == null ? ' none' : ''), textContent: fmt(a.avg) })));
   }
 }
@@ -151,14 +173,20 @@ function toListTop() {
   const sideBySide = matchMedia('(min-width: 1300px)').matches;
   if (!sideBySide || scrollY > y) scrollTo({ top: Math.max(0, y), behavior: 'instant' });
 }
+// Keep the best areas at the top. In difficulty mode that means hardest first; otherwise
+// best-rated first. Areas with nothing to show sink below the ones that do.
+function orderAreas() {
+  const key = a => state.sort === 'exam' ? (a.hardAvg ?? -1) : (a.avg ?? -1);
+  state.areas.sort((x, y) => (key(y) ?? -1) - (key(x) ?? -1) || x.name.localeCompare(y.name));
+}
 const syncUrl = () => { const u = new URL(location); state.area ? u.searchParams.set('a', state.area.id) : u.searchParams.delete('a'); history.replaceState(null, '', u); };
 
 function sorted(list) {
   const by = {
-    rating: (a, b) => score(b) - score(a) || b.n - a.n || a.area.rank - b.area.rank || a.name.localeCompare(b.name),
-    count: (a, b) => b.n - a.n || score(b) - score(a) || a.area.rank - b.area.rank || a.name.localeCompare(b.name),
-    name: (a, b) => a.name.localeCompare(b.name),
-    exam: (a, b) => (EXAMS[b.code]?.fail ?? -1) - (EXAMS[a.code]?.fail ?? -1) || a.name.localeCompare(b.name),
+    rating: (a, b) => expired(a) - expired(b) || score(b) - score(a) || b.n - a.n || a.area.rank - b.area.rank || a.name.localeCompare(b.name),
+    count: (a, b) => expired(a) - expired(b) || b.n - a.n || score(b) - score(a) || a.area.rank - b.area.rank || a.name.localeCompare(b.name),
+    name: (a, b) => expired(a) - expired(b) || a.name.localeCompare(b.name),
+    exam: (a, b) => expired(a) - expired(b) || (diffScore(b) ?? -1) - (diffScore(a) ?? -1) || a.name.localeCompare(b.name),
   }[state.sort];
   return [...list].sort(by);
 }
@@ -184,10 +212,11 @@ function renderTable() {
       el('span', { className: 'nm' }, el('b', { textContent: m.name, title: m.name }),
         el('small', {}, m.area.name, dormant(m.code) ? el('i', { className: 'stale', textContent: ` · last offered ${dormant(m.code).last}` }) : null)),
       el('span', { className: 'ec', textContent: m.ects ? `${m.ects} ECTS` : '' }),
-      state.sort === 'exam'
-        ? el('span', { className: 'df' + (EXAMS[m.code] ? '' : ' none'), title: EXAMS[m.code] ? `${EXAMS[m.code].sat} candidates over ${EXAMS[m.code].sittings} sitting(s)` : 'No exam statistics' },
-            EXAMS[m.code] ? `${EXAMS[m.code].fail}%` : '—', EXAMS[m.code] ? el('small', { textContent: 'failed' }) : null)
-        : el('span', { className: 'df' + (m.diff == null ? ' none' : ''), title: m.diff == null ? 'No difficulty votes yet' : `Difficulty ${fmt(m.diff)} of 5` }, m.diff == null ? '—' : diffWord(m.diff), m.diff == null ? null : el('small', { textContent: fmt(m.diff) })),
+      (() => { const d = difficulty(m);
+        return el('span', { className: 'df' + (d ? '' : ' none'),
+          title: d ? `Difficulty ${d.score.toFixed(1)} of 5, from ${d.from === 'exam' ? 'exam results' : d.from === 'students' ? 'student votes' : 'exam results and student votes'}` : 'Not scored yet' },
+          d ? d.score.toFixed(1) : '—',
+          d ? el('small', { textContent: d.from === 'exam' ? 'exam' : d.from === 'students' ? 'students' : 'exam+votes' }) : null); })(),
       meter(m.avg),
       el('span', { className: 'sc' + (m.avg == null ? ' none' : '') }, fmt(m.avg), m.n ? el('small', { textContent: `${m.n} rating${m.n > 1 ? 's' : ''}` }) : null)));
   }
@@ -280,7 +309,14 @@ async function openCourse(m) {
     examLine(m),
     el('div', { className: 'score' },
       el('div', { className: 'big' }, fmt(info.avg), el('small', { textContent: info.n ? `${info.n} rating${info.n > 1 ? 's' : ''}` : 'not rated yet' }),
-        el('span', { className: 'dif', textContent: info.difficulty != null ? `${diffWord(info.difficulty)} · ${fmt(info.difficulty)}/5 difficulty` : 'No difficulty votes' })),
+        (() => { const d = difficulty(m);
+          if (!d) return el('span', { className: 'dif', textContent: 'Difficulty not scored yet' });
+          const how = d.from === 'exam' ? `from a ${d.fail}% exam failure rate, until students vote`
+            : d.from === 'students' ? `from ${d.votes} student vote${d.votes > 1 ? 's' : ''}`
+            : `${d.votes} student vote${d.votes > 1 ? 's' : ''} blended with a ${d.fail}% exam failure rate`;
+          return el('span', { className: 'dif', title: how },
+            `Difficulty ${d.score.toFixed(1)}/5 · ${diffWord(d.score)}`, el('small', { textContent: how }));
+        })()),
       el('div', { className: 'hist', aria: { label: 'Rating distribution' } }, ...[5, 4, 3, 2, 1].map(s =>
         el('div', {}, String(s), el('span', {}, el('b', { style: `width:${dist[s - 1] / max * 100}%` })), String(dist[s - 1]))))),
     info.prof_avgs.length ? el('h3', { textContent: 'Teaching' }) : null,
@@ -447,6 +483,7 @@ if (!/Mac|iPhone|iPad/.test(navigator.platform)) $('.find kbd').textContent = 'C
 document.querySelectorAll('.sort button').forEach(b => b.onclick = () => {
   state.sort = b.dataset.sort;
   document.querySelectorAll('.sort button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  orderAreas();
   const note = $('#areas-note');
   if (note) note.textContent = state.sort === 'exam'
     ? 'Each bar is one course, hardest exam first. Colour is the share who failed. Grey means no exam data.'
