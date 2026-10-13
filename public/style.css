@@ -116,8 +116,28 @@ main { padding: 0 clamp(var(--space-sm), 3vw, var(--space-2xl)) var(--space-2xl)
 .sort button:hover { color: var(--color-ink); border-color: var(--color-rule-2); }
 .sort button[aria-selected="true"] { background: var(--color-ink); color: var(--color-paper); }
 #rows { list-style: none; margin: 0; padding: 0; }
+.table .head { row-gap: var(--space-xs); }
+.diff { display: flex; align-items: center; gap: var(--space-3xs); margin-left: auto; }
+.diff span { font: 600 var(--text-xs)/1 var(--font-display); text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-ink-3); margin-right: var(--space-3xs); }
+.diff button {
+  border: 1px solid var(--color-rule-2); background: none; padding: var(--space-3xs) var(--space-xs); border-radius: 999px; cursor: pointer; white-space: nowrap;
+  font: 600 var(--text-sm)/1.4 var(--font-display); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink-2);
+}
+.diff button:hover { border-color: var(--color-ink-3); color: var(--color-ink); }
+.diff button[aria-pressed="true"] { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); }
+.row .df { font: 600 var(--text-sm)/1 var(--font-display); text-transform: uppercase; letter-spacing: 0.03em; text-align: right; white-space: nowrap; }
+.row .df small { display: block; font: 400 var(--text-2xs)/1.4 var(--font-body); text-transform: none; color: var(--color-ink-3); }
+.row .df.none { color: var(--color-ink-3); font-weight: 500; }
+.score .dif { display: block; font: 600 var(--text-xs)/1.4 var(--font-display); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink-2); margin-top: var(--space-2xs); }
+.diffpick { display: inline-flex; gap: 4px; }
+.diffpick button {
+  width: 2rem; height: 2rem; border-radius: var(--radius-sm); border: 1px solid var(--color-rule-2); background: none; cursor: pointer;
+  font: 600 var(--text-sm)/1 var(--font-display); color: var(--color-ink-2); transition: background-color var(--dur-short) var(--ease-out);
+}
+.diffpick button:hover { border-color: var(--color-ink-3); }
+.diffpick button.on { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-paper); }
 .row {
-  display: grid; grid-template-columns: 2.5rem 6.5rem minmax(0, 1fr) 3rem 9rem 4.5rem; gap: var(--space-sm); align-items: center;
+  display: grid; grid-template-columns: 2.5rem 6.5rem minmax(0, 1fr) 3rem 4.5rem 8rem 4.5rem; gap: var(--space-sm); align-items: center;
   padding: var(--space-xs) var(--space-2xs); border-bottom: var(--rule); cursor: pointer;
   transition: background-color var(--dur-short) var(--ease-out);
 }
@@ -222,7 +242,9 @@ main { padding: 0 clamp(var(--space-sm), 3vw, var(--space-2xl)) var(--space-2xl)
   .area { grid-template-columns: minmax(0, 1fr) 3.5rem; gap: var(--space-2xs) var(--space-sm); }
   .area .bars { grid-column: 1 / -1; grid-row: 2; height: 24px; }
   .row { grid-template-columns: 2rem minmax(0, 1fr) 3.5rem; gap: var(--space-2xs) var(--space-sm); }
+  .row { grid-template-columns: 2rem minmax(0, 1fr) 3.5rem 3.5rem; }
   .row .cd, .row .ec, .row .meter { display: none; }
+  .diff { margin-left: 0; flex-wrap: wrap; }
   .head h2 { font-size: var(--text-xl); }
   .foot { padding: var(--space-md) var(--space-sm) var(--space-xl); }
   #drawer { padding: var(--space-md); border-left: 0; }

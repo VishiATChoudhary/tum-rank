@@ -5,7 +5,8 @@ Report vulnerabilities privately via GitHub's "Report a vulnerability" (Security
 | Attack | Defence |
 | --- | --- |
 | Spam / ads in comments | Plain text only, 200 chars; links, domains, emails, phone numbers, ad words rejected; repeated characters/words and shouting rejected; duplicate comments rejected |
-| Hate speech | Slur blocklist (EN/DE) + community reports + moderator removal |
+| Vulgar or abusive comments | Three tiers. Slurs, sexual vulgarity, strong profanity and threats (EN + DE, leetspeak and spaced-out spellings normalised) are rejected. Insults and name-calling are held: the stars count, the comment stays hidden until a moderator approves it. Honest criticism is published. |
+| Hate speech | Same blocklist + community reports + moderator removal |
 | Unicode tricks (zalgo, bidi override, zero-width) | NFKC normalisation, control/bidi/zero-width characters stripped, combining-mark limit |
 | XSS | Server rejects markup characters; client renders all user text via `textContent`; strict CSP (`script-src 'self'`, no inline script) |
 | Ballot stuffing (clearing cookies, many tabs) | One rating per course per browser (edits replace it); max 4 ratings per course per network per day; per-network hourly/daily limits; global write ceiling |
@@ -21,6 +22,6 @@ Report vulnerabilities privately via GitHub's "Report a vulnerability" (Security
 | Oversized requests | 4 KB body limit, 10 s function timeout |
 | Bots filling forms | Hidden honeypot field; bot submissions get a fake success |
 | IP spoofing | IP read from Vercel's edge headers (client `X-Forwarded-For` is overwritten) |
-| Privacy | IPs stored only as salted HMAC hashes; no accounts, no analytics |
+| Privacy / anonymity | No accounts or names. A rating is tied to a random cookie and a salted HMAC of the IP; raw IPs are never stored and moderators never see them |
 
 Known limits: a determined attacker with many IPs (VPNs, botnets) can still add ratings slowly. Next step if that happens: verify TUM email addresses before a rating counts.

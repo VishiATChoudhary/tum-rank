@@ -47,6 +47,13 @@
   <section class="table" aria-labelledby="table-h">
     <div class="head">
       <h2 id="table-h">All courses</h2>
+      <div class="diff" role="group" aria-label="Filter by difficulty">
+        <span>Difficulty</span>
+        <button data-diff="any" aria-pressed="true">Any</button>
+        <button data-diff="easy" aria-pressed="false">Easy</button>
+        <button data-diff="medium" aria-pressed="false">Medium</button>
+        <button data-diff="hard" aria-pressed="false">Hard</button>
+      </div>
       <div class="sort" role="tablist" aria-label="Sort by">
         <button role="tab" data-sort="rating" aria-selected="true">Top rated</button>
         <button role="tab" data-sort="count" aria-selected="false">Most rated</button>
@@ -59,7 +66,7 @@
 </main>
 
 <footer class="foot">
-  <span>Course data from TUMonline. Ratings are anonymous, text only, 200 characters. Rankings weight courses by how many people rated them.</span>
+  <span>Course data from TUMonline. Ratings are anonymous: no accounts, no names, IPs are never stored. Comments are text only, 200 characters, and insults wait for a moderator. Rankings weight courses by how many people rated them.</span>
   <button id="adddeg" class="link">Request another degree</button>
 </footer>
 

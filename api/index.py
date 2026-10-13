@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS suggestions(
   iph TEXT NOT NULL, created TIMESTAMPTZ NOT NULL DEFAULT now(), status TEXT NOT NULL DEFAULT 'pending');
 CREATE TABLE IF NOT EXISTS hits(iph TEXT NOT NULL, kind TEXT NOT NULL, ts TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS hits_lookup ON hits(iph, kind, ts);
+ALTER TABLE ratings ADD COLUMN IF NOT EXISTS difficulty SMALLINT CHECK (difficulty BETWEEN 1 AND 5);
+ALTER TABLE ratings ADD COLUMN IF NOT EXISTS comment_status TEXT NOT NULL DEFAULT 'live';
 """
 _conn = None
 def db():
@@ -49,7 +51,29 @@ LIMITS = {  # kind: (max, window)
 BAD = re.compile(
     r"https?:|www\.|\b[\w-]+\.(com|net|org|de|io|ru|xyz|cn|me|ly|gg|co|app|link)\b|@[\w-]+\.|\bt\.me\b|"
     r"whatsapp|telegram|discord\.gg|onlyfans|\bcrypto\b|\bviagra\b|\bcasino\b|\bbtc\b|\busdt\b|\+?\d[\d\s/().-]{8,}", re.I)
-SLURS = re.compile(r"\b(n[i1]gg|f[a@]gg?ot|k[i1]ke|retard|hure|schlampe|fotze|wichser|hurensohn|spast|neger)\w*", re.I)
+# Tier 1, rejected: slurs, sexual vulgarity, strong profanity (EN + DE)
+HARD = re.compile(r"\b(n[i]gg\w*|neger\w*|fag(got)?s?|k[i]ke\w*|retard\w*|tranny|"
+    r"fuck\w*|\w*fucker|motherf\w*|cunt\w*|twat\w*|cock(sucker)?s?|dick(head)?s?|pussy|bitch\w*|whore\w*|slut\w*|bastard\w*|asshole\w*|wank\w*|"
+    r"fotze\w*|wichs\w*|hurensohn\w*|hure\w*|schlampe\w*|missgeburt\w*|spast\w*|mongo\w*|fick\w*|arschloch\w*|schwuchtel\w*|kys|kill yourself|go die|drop dead|verreck\w*)\b")
+# squashed check catches "f.u.c.k", "f u c k" (only long, unambiguous stems to avoid false hits)
+HARD_SQUASHED = re.compile(r"fuck|motherf|nigger|nigga|faggot|hurensohn|wichser|fotze|arschloch|schlampe|missgeburt|schwuchtel")
+# Tier 2, held for a moderator: insults and name-calling, personal attacks
+SOFT = re.compile(r"\b(shit\w*|crap\w*|bullshit|idiot\w*|stupid\w*|moron\w*|dumb\w*|imbecile|incompetent|useless|worthless|pathetic|garbage|trash|"
+    r"sucks?|hate|hated|disgusting|clown|joke of a|lazy|arrogant|ass|arsch\w*|dumm\w*|blöd\w*|doof\w*|depp\w*|trottel\w*|vollidiot\w*|"
+    r"scheiß\w*|scheiss\w*|kacke|kack\w*|unfähig\w*|inkompetent\w*|nutzlos\w*|faul|faule\w*|behindert\w*|versager\w*|lächerlich\w*|"
+    r"müll|abschaum|psycho\w*|creep\w*|sexist\w*|rassist\w*|racist\w*)\b")
+LEET = str.maketrans({"0": "o", "1": "i", "!": "i", "|": "i", "3": "e", "4": "a", "@": "a", "5": "s", "$": "s", "7": "t", "+": "t", "8": "b", "9": "g"})
+
+def tone(s):
+    """'reject', 'hold' or 'ok' for a cleaned comment."""
+    low = s.lower().translate(LEET)
+    low = re.sub(r"(\w)\1{2,}", r"\1\1", low)               # fuuuuck -> fuuck
+    squashed = re.sub(r"[^a-zäöüß]", "", low)
+    squashed = re.sub(r"(\w)\1+", r"\1", squashed)            # fuuck -> fuck, niggger -> niger
+    if HARD.search(low) or HARD_SQUASHED.search(squashed) or HARD_SQUASHED.search(re.sub(r"(\w)\1+", r"\1", low.replace(" ", ""))):
+        return "reject"
+    if SOFT.search(low): return "hold"
+    return "ok"
 
 def clean(s, mx, minlen=1):
     if not isinstance(s, str): raise ValueError("Text required.")
@@ -61,7 +85,6 @@ def clean(s, mx, minlen=1):
     if len(s) > mx: raise ValueError(f"Max {mx} characters.")
     if re.search(r"[<>{}\[\]\\`]", s): raise ValueError("Plain text only, no markup.")
     if BAD.search(s): raise ValueError("No links, contact details or ads.")
-    if SLURS.search(s): raise ValueError("Keep it civil.")
     if re.search(r"(.)\1{5,}", s) or re.search(r"(\b\w+\b)(\W+\1\b){3,}", s, re.I): raise ValueError("Too repetitive.")
     letters = sum(c.isalpha() for c in s)
     if len(s) >= 6 and letters / len(s) < 0.55: raise ValueError("Text only, please.")
@@ -126,9 +149,11 @@ class handler(BaseHTTPRequestHandler):
             if p == "/api/stats":
                 rows = db().execute("""SELECT key, avg(course_stars)::float a, count(*) n, avg(prof_stars)::float p,
                     count(*) FILTER (WHERE course_stars=1) d1, count(*) FILTER (WHERE course_stars=2) d2, count(*) FILTER (WHERE course_stars=3) d3,
-                    count(*) FILTER (WHERE course_stars=4) d4, count(*) FILTER (WHERE course_stars=5) d5
+                    count(*) FILTER (WHERE course_stars=4) d4, count(*) FILTER (WHERE course_stars=5) d5,
+                    avg(difficulty)::float df, count(difficulty) dn
                     FROM ratings WHERE status='live' GROUP BY key""").fetchall()
-                return self.send({r["key"]: [round(r["a"], 3), r["n"], r["p"] and round(r["p"], 2), r["d1"], r["d2"], r["d3"], r["d4"], r["d5"]] for r in rows},
+                return self.send({r["key"]: [round(r["a"], 3), r["n"], r["p"] and round(r["p"], 2), r["d1"], r["d2"], r["d3"], r["d4"], r["d5"],
+                                   r["df"] and round(r["df"], 2), r["dn"]] for r in rows},
                                  cache="public, s-maxage=20, stale-while-revalidate=60")
             if p == "/api/extra":
                 spo = int(q.get("spo", ["0"])[0])
@@ -136,23 +161,27 @@ class handler(BaseHTTPRequestHandler):
                 return self.send([{"key": f"s:{r['id']}", "parent": r["parent"], "name": r["name"]} for r in rows], cache="public, s-maxage=60")
             if m := re.fullmatch(r"/api/module/([\w:.-]{1,40})", p):
                 key = m[1]; tok, new = self.token()
-                rs = db().execute("""SELECT id, course_stars, prof_name, prof_stars, comment FROM ratings
+                rs = db().execute("""SELECT id, course_stars, prof_name, prof_stars, difficulty,
+                                     CASE WHEN comment_status='live' THEN comment ELSE '' END comment FROM ratings
                                      WHERE key=%s AND status='live' ORDER BY created DESC LIMIT 200""", (key,)).fetchall()
                 profs = {}
                 for r in rs:
                     if r["prof_name"] and r["prof_stars"]: profs.setdefault(r["prof_name"], []).append(r["prof_stars"])
-                mine = db().execute("SELECT course_stars, prof_name, prof_stars, comment FROM ratings WHERE key=%s AND token=%s", (key, tok)).fetchone()
+                mine = db().execute("SELECT course_stars, prof_name, prof_stars, difficulty, comment, comment_status FROM ratings WHERE key=%s AND token=%s", (key, tok)).fetchone()
+                diffs = [r["difficulty"] for r in rs if r["difficulty"]]
                 return self.send({
                     "avg": round(sum(r["course_stars"] for r in rs) / len(rs), 2) if rs else None, "n": len(rs),
+                    "difficulty": round(sum(diffs) / len(diffs), 2) if diffs else None, "difficulty_n": len(diffs),
                     # a lecturer only shows up once two different people rated them (limits one-person smear/boost)
                     "prof_avgs": [{"name": k, "avg": round(sum(v) / len(v), 2), "n": len(v)} for k, v in profs.items() if len(v) >= 2],
-                    "ratings": [{"id": r["id"], "course": r["course_stars"], "prof": r["prof_name"], "prof_stars": r["prof_stars"], "comment": r["comment"]} for r in rs],
+                    "ratings": [{"id": r["id"], "course": r["course_stars"], "prof": r["prof_name"], "prof_stars": r["prof_stars"], "difficulty": r["difficulty"], "comment": r["comment"]} for r in rs],
                     "mine": mine}, cookie=tok if new else None)
             if p == "/api/admin/queue":
                 if not self.is_admin(): return self.send({"error": "Forbidden"}, 403)
                 sug = db().execute("SELECT id, kind, spo, parent, name, created::text FROM suggestions WHERE status='pending' ORDER BY created").fetchall()
                 flagged = db().execute("SELECT id, key, course_stars, prof_name, prof_stars, comment, reports, created::text FROM ratings WHERE status='flagged' ORDER BY created").fetchall()
-                return self.send({"suggestions": sug, "flagged": flagged})
+                held = db().execute("SELECT id, key, course_stars, comment, created::text FROM ratings WHERE comment_status='pending' AND status='live' ORDER BY created").fetchall()
+                return self.send({"suggestions": sug, "flagged": flagged, "held": held})
             return self.send({"error": "Not found"}, 404)
         except Exception as e:
             print("GET error", repr(e)); return self.send({"error": "Server error"}, 500)
@@ -195,19 +224,27 @@ class handler(BaseHTTPRequestHandler):
                 pn = clean(pn, 60, 3)
                 if not re.fullmatch(r"(?:Prof\. |Dr\. )*[^\W\d_][^\W\d_'\u2019.-]*(?:[ '\u2019.-]+[^\W\d_]+)+\.?", pn): raise ValueError("Professor: first and last name.")
             else: pn = None
+            df = b.get("difficulty")
+            if df is not None and (type(df) is not int or not 1 <= df <= 5): raise ValueError("Difficulty is 1 to 5.")
             com = clean(b["comment"], 200, 3) if (b.get("comment") or "").strip() else ""
+            verdict = tone(com) if com else "ok"
+            if pn and tone(pn) != "ok": raise ValueError("Professor: first and last name.")
+            if verdict == "reject": raise ValueError("Please keep it civil. Criticism is welcome, insults and vulgar language aren't.")
             if com and db().execute("SELECT 1 FROM ratings WHERE lower(comment)=lower(%s) AND token<>%s", (com, tok)).fetchone(): raise ValueError("Someone already wrote exactly that.")
             # cookie clearing: at most 4 different ratings per course from one network per day
             same_net = db().execute("SELECT count(*) c FROM ratings WHERE key=%s AND iph=%s AND token<>%s AND created > now() - interval '1 day'", (key, iph, tok)).fetchone()["c"]
             if same_net >= 4: raise ValueError("Too many ratings for this course from your network today.")
             if limited(iph, "rate") or limited(iph, "rate_day"): raise ValueError("Slow down, try again later.")
             hit(iph, "rate", "rate_day"); hit("*", "global_write")
-            db().execute("""INSERT INTO ratings(key, token, iph, course_stars, prof_name, prof_stars, comment) VALUES (%s,%s,%s,%s,%s,%s,%s)
+            cstat = "pending" if verdict == "hold" else "live"
+            db().execute("""INSERT INTO ratings(key, token, iph, course_stars, prof_name, prof_stars, difficulty, comment, comment_status)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (key, token) DO UPDATE SET course_stars=EXCLUDED.course_stars, prof_name=EXCLUDED.prof_name,
-                prof_stars=EXCLUDED.prof_stars, comment=EXCLUDED.comment, iph=EXCLUDED.iph, created=now(),
-                status=CASE WHEN ratings.status='removed' THEN 'removed' ELSE 'live' END, reports=0""",
-                (key, tok, iph, cs, pn, ps, com))
-            return {"ok": True}
+                prof_stars=EXCLUDED.prof_stars, difficulty=EXCLUDED.difficulty, comment=EXCLUDED.comment, comment_status=EXCLUDED.comment_status,
+                iph=EXCLUDED.iph, created=now(), status=CASE WHEN ratings.status='removed' THEN 'removed' ELSE 'live' END, reports=0""",
+                (key, tok, iph, cs, pn, ps, df, com, cstat))
+            if cstat == "pending": return {"ok": True, "message": "Rating saved. Your comment shows up once a moderator has read it."}
+            return {"ok": True, "message": "Rating saved."}
 
         if p == "/api/report":
             rid = b.get("id")
@@ -251,6 +288,9 @@ class handler(BaseHTTPRequestHandler):
                 msg = "Done."
                 if row and row["kind"] == "degree" and action == "approve": msg = dispatch_import(row["spo"])
                 return {"ok": True, "message": msg}
+            if what == "comment" and action in ("approve", "reject"):
+                db().execute("UPDATE ratings SET comment_status=%s WHERE id=%s", ("live" if action == "approve" else "removed", i))
+                return {"ok": True, "message": "Done."}
             if what == "rating" and action in ("restore", "remove"):
                 db().execute("UPDATE ratings SET status=%s WHERE id=%s", ("live" if action == "restore" else "removed", i))
                 if action == "restore": db().execute("DELETE FROM reports WHERE rating_id=%s", (i,))

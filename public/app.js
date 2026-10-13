@@ -19,7 +19,10 @@ const score = m => m.n ? (m.avg * m.n + PRIOR * PRIOR_N) / (m.n + PRIOR_N) : -1;
 const tier = a => 'r' + Math.min(5, Math.max(1, Math.round(a)));
 const PLACEHOLDER = /anerkennung|recognition|platzhalter|placeholder/i;
 
-const state = { spo: null, degrees: [], mods: [], areas: [], area: null, sort: 'rating', limit: 60, open: null };
+const state = { spo: null, degrees: [], mods: [], areas: [], area: null, sort: 'rating', diff: 'any', limit: 60, open: null };
+// difficulty bands on the 1-5 average
+const DIFF = { any: () => true, easy: d => d != null && d < 2.5, medium: d => d != null && d >= 2.5 && d < 3.5, hard: d => d != null && d >= 3.5 };
+const diffWord = d => d == null ? '' : d < 2.5 ? 'Easy' : d < 3.5 ? 'Medium' : 'Hard';
 
 function prettyDegree(t) {
   const m = t.match(/^\d+ \d+ (.+?) \((\d{4})\d, (\w+?)studium, (\w+)\)/);
@@ -34,7 +37,7 @@ function build(tree, stats, extra) {
   const byId = new Map();
   (function index(n) { n.children ||= []; byId.set(n.id, n); n.key = n.code; n.children.forEach(index); })(tree);
   for (const x of extra) byId.get(x.parent)?.children.push({ id: x.key, key: x.key, name: x.name, user: 1, children: [] });
-  (function attach(n) { const s = stats[n.key]; if (s) Object.assign(n, { avg: s[0], n: s[1], pavg: s[2], dist: s.slice(3) }); n.children.forEach(attach); })(tree);
+  (function attach(n) { const s = stats[n.key]; if (s) Object.assign(n, { avg: s[0], n: s[1], pavg: s[2], dist: s.slice(3, 8), diff: s[8] ?? null, diffN: s[9] || 0 }); n.children.forEach(attach); })(tree);
   const hasCode = n => n.children.some(c => c.code || hasCode(c));
   (function walk(n, anc) {
     const leafish = (n.code && !hasCode(n)) || (n.user && !n.children.length);
@@ -45,7 +48,7 @@ function build(tree, stats, extra) {
       if (!a) areas.set(area.id, a = { id: area.id, name: area.name, group: group.name, mods: [], keys: new Set() });
       if (a.keys.has(n.key)) return;
       a.keys.add(n.key);
-      const m = { key: n.key, code: n.code, name: n.name, ects: n.ects, avg: n.avg ?? null, n: n.n || 0, dist: n.dist, pavg: n.pavg, area: a, user: n.user };
+      const m = { key: n.key, code: n.code, name: n.name, ects: n.ects, avg: n.avg ?? null, n: n.n || 0, dist: n.dist, pavg: n.pavg, diff: n.diff ?? null, area: a, user: n.user };
       a.mods.push(m); mods.push(m);
       return;
     }
@@ -106,12 +109,19 @@ function renderAreas() {
     group = a.group;
     box.append(el('button', {
       className: 'area', aria: { pressed: String(state.area === a) },
-      onclick: () => { state.area = state.area === a ? null : a; state.limit = 60; syncUrl(); renderAreas(); renderTable(); $('#table-h').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); },
+      onclick: () => { state.area = state.area === a ? null : a; state.limit = 60; syncUrl(); renderAreas(); renderTable(); toListTop(); },
     },
       el('span', { className: 'nm', title: a.name }, el('span', { className: 't', textContent: a.name }), el('small', { textContent: `${a.mods.length} course${a.mods.length === 1 ? '' : 's'} · ${a.rated} rated` })),
       bars(a.mods),
       el('span', { className: 'avg' + (a.avg == null ? ' none' : ''), textContent: fmt(a.avg) })));
   }
+}
+// show the first row of the list: side-by-side layout only scrolls up if we're past the list start; stacked layout jumps to the list
+function toListTop() {
+  const mast = $('.mast').offsetHeight;
+  const y = $('.table').getBoundingClientRect().top + scrollY - mast;
+  const sideBySide = matchMedia('(min-width: 1300px)').matches;
+  if (!sideBySide || scrollY > y) scrollTo({ top: Math.max(0, y), behavior: 'instant' });
 }
 const syncUrl = () => { const u = new URL(location); state.area ? u.searchParams.set('a', state.area.id) : u.searchParams.delete('a'); history.replaceState(null, '', u); };
 
@@ -130,7 +140,7 @@ function meter(avg) {
 }
 
 function renderTable() {
-  const list = sorted(state.area ? state.area.mods : state.mods);
+  const list = sorted((state.area ? state.area.mods : state.mods).filter(m => DIFF[state.diff](m.diff)));
   $('#table-h').textContent = state.area ? state.area.name : 'All courses';
   const rows = $('#rows'); rows.replaceChildren();
   let rank = 0;
@@ -144,10 +154,11 @@ function renderTable() {
       el('span', { className: 'cd', textContent: m.code || 'added' }),
       el('span', { className: 'nm' }, el('b', { textContent: m.name, title: m.name }), el('small', { textContent: m.area.name })),
       el('span', { className: 'ec', textContent: m.ects ? `${m.ects} ECTS` : '' }),
+      el('span', { className: 'df' + (m.diff == null ? ' none' : ''), title: m.diff == null ? 'No difficulty votes yet' : `Difficulty ${fmt(m.diff)} of 5` }, m.diff == null ? '—' : diffWord(m.diff), m.diff == null ? null : el('small', { textContent: fmt(m.diff) })),
       meter(m.avg),
       el('span', { className: 'sc' + (m.avg == null ? ' none' : '') }, fmt(m.avg), m.n ? el('small', { textContent: `${m.n} rating${m.n > 1 ? 's' : ''}` }) : null)));
   }
-  if (!list.length) rows.append(el('li', { className: 'empty', textContent: 'No courses here yet.' }));
+  if (!list.length) rows.append(el('li', { className: 'empty', textContent: state.diff === 'any' ? 'No courses here yet.' : 'No course here has enough difficulty votes for this filter yet.' }));
   if (list.length > state.limit) rows.append(el('li', {}, el('button', { className: 'btn more', textContent: `Show all ${list.length}`, onclick: () => { state.limit = Infinity; renderTable(); } })));
   renderSuggest();
 }
@@ -182,6 +193,15 @@ $('#scrim').onclick = closeDrawer;
 addEventListener('keydown', e => { if (e.key === 'Escape' && state.open) closeDrawer(); });
 
 const canHover = matchMedia('(hover: hover)').matches;
+function diffPicker(value, onChange) {
+  let v = value || 0;
+  const wrap = el('span', { className: 'diffpick', role: 'radiogroup', aria: { label: 'Difficulty, 1 easy to 5 very hard' } });
+  const words = ['Very easy', 'Easy', 'Medium', 'Hard', 'Very hard'];
+  const paint = () => [...wrap.children].forEach((b, i) => { b.classList.toggle('on', i + 1 <= v); b.setAttribute('aria-checked', String(i + 1 === v)); });
+  for (let i = 1; i <= 5; i++) wrap.append(el('button', { type: 'button', textContent: i, role: 'radio', title: words[i - 1], aria: { label: `${i}, ${words[i - 1]}` },
+    onclick: () => { v = v === i ? 0 : i; paint(); onChange(v); } }));
+  paint(); return wrap;
+}
 function starPicker(label, value, onChange) {
   let v = value || 0;
   const wrap = el('span', { className: 'stars', role: 'radiogroup', aria: { label } });
@@ -222,7 +242,8 @@ async function openCourse(m) {
     el('h2', { textContent: info.name }),
     el('div', { className: 'where', textContent: m.area.name }),
     el('div', { className: 'score' },
-      el('div', { className: 'big' }, fmt(info.avg), el('small', { textContent: info.n ? `${info.n} rating${info.n > 1 ? 's' : ''}` : 'not rated yet' })),
+      el('div', { className: 'big' }, fmt(info.avg), el('small', { textContent: info.n ? `${info.n} rating${info.n > 1 ? 's' : ''}` : 'not rated yet' }),
+        el('span', { className: 'dif', textContent: info.difficulty != null ? `${diffWord(info.difficulty)} · ${fmt(info.difficulty)}/5 difficulty` : 'No difficulty votes' })),
       el('div', { className: 'hist', aria: { label: 'Rating distribution' } }, ...[5, 4, 3, 2, 1].map(s =>
         el('div', {}, String(s), el('span', {}, el('b', { style: `width:${dist[s - 1] / max * 100}%` })), String(dist[s - 1]))))),
     info.prof_avgs.length ? el('h3', { textContent: 'Teaching' }) : null,
@@ -239,26 +260,27 @@ function comments(info) {
   const list = info.ratings.filter(r => r.comment);
   if (!list.length) return [el('p', { className: 'where', textContent: 'No comments yet. Be the first.' })];
   return list.map(r => el('div', { className: 'cm' },
-    el('div', { className: 'who' }, el('span', {}, el('b', { textContent: `${r.course}/5` }), r.prof ? ` · ${r.prof} ${r.prof_stars}/5` : ''),
+    el('div', { className: 'who' }, el('span', {}, el('b', { textContent: `${r.course}/5` }), r.difficulty ? ` · difficulty ${r.difficulty}/5` : '', r.prof ? ` · ${r.prof} ${r.prof_stars}/5` : ''),
       el('button', { textContent: 'Report', onclick: async e => { try { await api('report', { kind: 'rating', id: r.id }); e.target.replaceWith('Reported'); } catch (x) { toast(x.message); } } })),
     el('div', { textContent: r.comment })));
 }
 
 function rateForm(m, info) {
   const mine = info.mine || {};
-  const st = { cs: mine.course_stars || 0, ps: mine.prof_stars || 0 };
+  const st = { cs: mine.course_stars || 0, ps: mine.prof_stars || 0, df: mine.difficulty || 0 };
   const prof = el('input', { className: 'field', maxLength: 60, placeholder: 'Professor’s full name', value: mine.prof_name || '', list: 'profs', aria: { label: 'Professor name' } });
   const dl = el('datalist', { id: 'profs' }, ...info.professors.map(p => el('option', { value: p })));
   const com = el('textarea', { className: 'field', maxLength: 200, rows: 3, placeholder: 'One honest sentence helps the next student. Text only.', value: mine.comment || '', aria: { label: 'Comment' } });
   const cnt = el('span', { textContent: `${com.value.length} / 200` });
   com.oninput = () => { cnt.textContent = `${com.value.length} / 200`; com.removeAttribute('aria-invalid'); };
   const hp = el('input', { className: 'hp', tabIndex: -1, autocomplete: 'off', aria: { hidden: 'true' } });
-  const err = el('p', { className: 'err', role: 'alert' });
+  const err = el('p', { className: 'err', role: 'alert', textContent: mine.comment_status === 'pending' ? 'Your comment is waiting for a moderator.' : '' });
   const btn = el('button', { className: 'btn primary', textContent: info.mine ? 'Update rating' : 'Post rating' });
   const f = el('form', { className: 'rate' },
     el('h3', { textContent: info.mine ? 'Your rating' : 'Rate it' }),
     el('div', { className: 'line' }, el('label', { textContent: 'Course' }), starPicker('Course rating', st.cs, v => st.cs = v)),
     el('div', { className: 'line' }, el('label', { textContent: 'Professor' }), starPicker('Professor rating', st.ps, v => st.ps = v)),
+    el('div', { className: 'line' }, el('label', { textContent: 'Difficulty' }), diffPicker(st.df, v => st.df = v)),
     prof, dl, com, hp, el('div', { className: 'meta' }, cnt, btn), err);
   f.onsubmit = async e => {
     e.preventDefault(); err.textContent = '';
@@ -266,10 +288,10 @@ function rateForm(m, info) {
     if (st.ps && !prof.value.trim()) { err.textContent = 'Add the professor’s name, or clear their stars.'; prof.setAttribute('aria-invalid', 'true'); return; }
     btn.dataset.state = 'loading'; btn.disabled = true; btn.textContent = 'Posting…';
     try {
-      await api('rate', { key: m.key, course_stars: st.cs, prof_stars: st.ps || null, prof_name: st.ps ? prof.value : '', comment: com.value, website: hp.value });
+      const res = await api('rate', { key: m.key, course_stars: st.cs, prof_stars: st.ps || null, prof_name: st.ps ? prof.value : '', difficulty: st.df || null, comment: com.value, website: hp.value });
       await loadDegree(state.spo, true);
       const fresh = state.mods.find(x => x.key === m.key) || m;
-      openCourse(fresh); toast('Rating saved');
+      openCourse(fresh); toast(res.message || 'Rating saved');
     } catch (x) {
       err.textContent = x.message; com.setAttribute('aria-invalid', 'true');
       btn.dataset.state = ''; btn.disabled = false; btn.textContent = info.mine ? 'Update rating' : 'Post rating';
@@ -315,6 +337,11 @@ document.querySelectorAll('.sort button').forEach(b => b.onclick = () => {
   renderTable();
 });
 const fitSelect = () => { const s = $('#degree'); const probe = el('span', { textContent: s.selectedOptions[0]?.textContent || '', style: 'position:absolute;visibility:hidden;white-space:nowrap;font:600 var(--text-lg)/1.1 var(--font-display);text-transform:uppercase' }); document.body.append(probe); s.style.width = `calc(${probe.offsetWidth}px + var(--space-xl))`; probe.remove(); };
+document.querySelectorAll('.diff button').forEach(b => b.onclick = () => {
+  state.diff = b.dataset.diff; state.limit = 60;
+  document.querySelectorAll('.diff button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  renderTable(); toListTop();
+});
 $('#degree').onchange = e => { fitSelect(); loadDegree(e.target.value); };
 $('#adddeg').onclick = () => {
   const foot = $('.foot'); if ($('#impf')) return $('#impf input').focus();

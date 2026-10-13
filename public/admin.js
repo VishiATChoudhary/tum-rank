@@ -17,6 +17,10 @@ async function load() {
       el('small', { textContent: s.kind === 'degree' ? `https://campus.tum.de/tumonline/wbstpcs.showSpoTree?pStpStpNr=${s.spo}` : `course in degree ${s.spo}, under node ${s.parent} · ${s.created.slice(0, 16)}` })),
     el('div', { className: 'acts' }, act('suggestion', s.id, 'approve'), act('suggestion', s.id, 'reject'))))
     : [el('li', { className: 'empty', textContent: 'Nothing waiting.' })]));
+  $('#held').replaceChildren(...(q.held.length ? q.held.map(r => el('li', {},
+    el('div', { className: 'what' }, el('b', { textContent: `${r.key} · ${r.course_stars}/5` }), el('div', { textContent: r.comment }), el('small', { textContent: r.created.slice(0, 16) })),
+    el('div', { className: 'acts' }, act('comment', r.id, 'approve'), act('comment', r.id, 'reject'))))
+    : [el('li', { className: 'empty', textContent: 'No comments waiting.' })]));
   $('#flag').replaceChildren(...(q.flagged.length ? q.flagged.map(r => el('li', {},
     el('div', { className: 'what' }, el('b', { textContent: `${r.key} · ${r.course_stars}/5` }), el('div', { textContent: r.comment || '(no comment)' }),
       el('small', { textContent: `${r.reports} reports${r.prof_name ? ` · ${r.prof_name} ${r.prof_stars}/5` : ''}` })),
