@@ -486,7 +486,7 @@ document.querySelectorAll('.sort button').forEach(b => b.onclick = () => {
   orderAreas();
   const note = $('#areas-note');
   if (note) note.textContent = state.sort === 'exam'
-    ? 'Each bar is one course, hardest exam first. Colour is the share who failed. Grey means no exam data.'
+    ? 'Each bar is one course, hardest first, coloured by its difficulty score. Grey means not scored yet.'
     : 'Each bar is one course, sorted best to worst. Grey bars have no ratings yet.';
   renderAreas(); renderTable();
 });
