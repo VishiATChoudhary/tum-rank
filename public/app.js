@@ -194,6 +194,7 @@ function closeDrawer() {
   const d = $('#drawer'); d.classList.remove('on'); d.setAttribute('aria-hidden', 'true');
   $('#scrim').classList.remove('on'); setTimeout(() => { $('#scrim').hidden = true; }, 280);
   state.open = null; document.querySelectorAll('.row.on').forEach(r => r.classList.remove('on'));
+  const u = new URL(location); u.searchParams.delete('c'); history.replaceState(null, '', u);
   lastFocus?.focus?.();
 }
 $('#scrim').onclick = closeDrawer;
@@ -224,6 +225,7 @@ function starPicker(label, value, onChange) {
 async function openCourse(m) {
   lastFocus = document.activeElement;
   state.open = m.key;
+  const u = new URL(location); u.searchParams.set('c', m.key); history.replaceState(null, '', u);
   document.querySelectorAll('.row').forEach(r => r.classList.toggle('on', r.dataset.key === m.key));
   const d = $('#drawer');
   d.replaceChildren(el('p', { className: 'where', textContent: 'Loading…' }));
@@ -399,4 +401,9 @@ $('#adddeg').onclick = () => {
   sel.value = want; document.fonts.ready.then(fitSelect);
   await loadDegree(want);
   const a = p.get('a'); if (a) { state.area = state.areas.find(x => x.id === a) || null; renderAreas(); renderTable(); }
+  const c = p.get('c');
+  if (c) {
+    const m = state.mods.find(x => x.key === c);
+    if (m) openCourse(m); else toast(`${c} is not in this degree.`);
+  }
 })();
