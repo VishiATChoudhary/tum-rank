@@ -275,13 +275,24 @@ function offerLine(m) {
 }
 
 // Discussions on other sites. We deep-link only: their text stays on their site.
+// Search links beat a curated thread list: they never 404, never go stale, and cover
+// every course rather than the handful somebody happened to post about.
+function searchLinks(m) {
+  const q = encodeURIComponent(m.code ? `${m.code} OR "${m.name}"` : m.name);
+  return [
+    { url: `https://www.reddit.com/r/tumunich/search/?q=${q}&restrict_sr=1&sort=relevance`,
+      title: `Search r/tumunich for ${m.code || m.name}`, src: 'reddit.com' },
+    { url: `https://www.studydrive.net/de/search?q=${encodeURIComponent(m.code || m.name)}`,
+      title: 'Find notes and old exams on Studydrive', src: 'studydrive.net' },
+  ];
+}
 function elsewhere(m) {
-  const ls = LINKS[m.code] || [];
-  if (!ls.length) return [];
-  return [el('h3', { textContent: 'Discussed elsewhere' }),
-    el('p', { className: 'where', textContent: 'Found on other sites. Opinions there are not part of the ratings above.' }),
-    ...ls.map(l => el('a', { className: 'out', href: l.url, target: '_blank', rel: 'noopener nofollow ugc' },
-      el('span', { textContent: l.title }), el('small', { textContent: [l.src, l.date].filter(Boolean).join(' · ') })))];
+  const curated = LINKS[m.code] || [];
+  const link = l => el('a', { className: 'out', href: l.url, target: '_blank', rel: 'noopener nofollow ugc' },
+    el('span', { textContent: l.title }), el('small', { textContent: [l.src, l.date].filter(Boolean).join(' · ') }));
+  return [el('h3', { textContent: 'Elsewhere' }),
+    el('p', { className: 'where', textContent: 'Other sites, opened in a new tab. Nothing there counts towards the ratings above.' }),
+    ...curated.map(link), ...searchLinks(m).map(link)];
 }
 function comments(info) {
   const list = info.ratings.filter(r => r.comment);

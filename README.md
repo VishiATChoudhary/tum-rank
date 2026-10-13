@@ -31,8 +31,16 @@ module. Covers 299 of 803 lecture-type courses.
 
 ## Course discussions elsewhere
 
-`data/links.tsv` holds deep links to places where a course is discussed (Reddit threads, blog posts).
-`python3 scripts/build_links.py` validates them and writes `public/data/links.json`.
+Every course page carries search links to r/tumunich and Studydrive, generated from the module
+code. Search links never 404, never go stale, and cover every course, unlike a curated thread
+list that covers a few dozen and rots.
+
+`data/links.tsv` additionally holds *verified* deep links to specific threads;
+`python3 scripts/build_links.py` validates them into `public/data/links.json`, and
+`scripts/verify_links.py` re-checks that each one still resolves. Note that Reddit cannot be
+verified programmatically (it returns an identical HTTP 200 for a nonexistent thread id), so
+threads must be eyeballed in a browser first. Candidates waiting for that:
+`docs/reddit-link-candidates.md`.
 
 **We link, we never copy.** Review text from other sites is copyrighted by its authors, and
 republishing criticism of a named lecturer would make this site the publisher under German
