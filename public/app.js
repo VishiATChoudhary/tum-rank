@@ -19,9 +19,10 @@ const score = m => m.n ? (m.avg * m.n + PRIOR * PRIOR_N) / (m.n + PRIOR_N) : -1;
 const tier = a => 'r' + Math.min(5, Math.max(1, Math.round(a)));
 const PLACEHOLDER = /anerkennung|recognition|platzhalter|placeholder/i;
 
-let LINKS = {}, DIGESTS = {}, OFF = {}, NEWEST = 0;
+let LINKS = {}, DIGESTS = {}, EXAMS = {}, OFF = {}, NEWEST = 0;
 getJSON('/data/links.json').then(d => { LINKS = d; }).catch(() => {});
 getJSON('/data/digests.json').then(d => { DIGESTS = d; }).catch(() => {});
+const examReady = getJSON('/data/exams.json').then(d => { EXAMS = d; }).catch(() => {});
 const offReady = getJSON('/data/offerings.json').then(d => { OFF = d; NEWEST = Math.max(0, ...Object.values(d).map(o => o.lastKey)); }).catch(() => {});
 // a module is "dormant" if it has history but has not run in the last ~2 years
 const dormant = code => { const o = OFF[code]; return o && NEWEST && o.lastKey < NEWEST - 20 ? o : null; };
@@ -81,7 +82,7 @@ function build(tree, stats, extra) {
 
 async function loadDegree(spo, keepArea) {
   state.spo = +spo;
-  await offReady;
+  await Promise.all([offReady, examReady]);
   const [tree, stats, extra] = await Promise.all([getJSON(`/data/trees/${spo}.json`), api('stats'), api('extra?spo=' + spo).catch(() => [])]);
   build(tree, stats, extra);
   if (!keepArea) { state.area = null; state.limit = 60; }
@@ -137,6 +138,7 @@ function sorted(list) {
     rating: (a, b) => score(b) - score(a) || b.n - a.n || a.area.rank - b.area.rank || a.name.localeCompare(b.name),
     count: (a, b) => b.n - a.n || score(b) - score(a) || a.area.rank - b.area.rank || a.name.localeCompare(b.name),
     name: (a, b) => a.name.localeCompare(b.name),
+    exam: (a, b) => (EXAMS[b.code]?.fail ?? -1) - (EXAMS[a.code]?.fail ?? -1) || a.name.localeCompare(b.name),
   }[state.sort];
   return [...list].sort(by);
 }
@@ -162,7 +164,10 @@ function renderTable() {
       el('span', { className: 'nm' }, el('b', { textContent: m.name, title: m.name }),
         el('small', {}, m.area.name, dormant(m.code) ? el('i', { className: 'stale', textContent: ` · last offered ${dormant(m.code).last}` }) : null)),
       el('span', { className: 'ec', textContent: m.ects ? `${m.ects} ECTS` : '' }),
-      el('span', { className: 'df' + (m.diff == null ? ' none' : ''), title: m.diff == null ? 'No difficulty votes yet' : `Difficulty ${fmt(m.diff)} of 5` }, m.diff == null ? '—' : diffWord(m.diff), m.diff == null ? null : el('small', { textContent: fmt(m.diff) })),
+      state.sort === 'exam'
+        ? el('span', { className: 'df' + (EXAMS[m.code] ? '' : ' none'), title: EXAMS[m.code] ? `${EXAMS[m.code].sat} candidates over ${EXAMS[m.code].sittings} sitting(s)` : 'No exam statistics' },
+            EXAMS[m.code] ? `${EXAMS[m.code].fail}%` : '—', EXAMS[m.code] ? el('small', { textContent: 'failed' }) : null)
+        : el('span', { className: 'df' + (m.diff == null ? ' none' : ''), title: m.diff == null ? 'No difficulty votes yet' : `Difficulty ${fmt(m.diff)} of 5` }, m.diff == null ? '—' : diffWord(m.diff), m.diff == null ? null : el('small', { textContent: fmt(m.diff) })),
       meter(m.avg),
       el('span', { className: 'sc' + (m.avg == null ? ' none' : '') }, fmt(m.avg), m.n ? el('small', { textContent: `${m.n} rating${m.n > 1 ? 's' : ''}` }) : null)));
   }
@@ -252,6 +257,7 @@ async function openCourse(m) {
     el('h2', { textContent: info.name }),
     el('div', { className: 'where', textContent: m.area.name }),
     offerLine(m),
+    examLine(m),
     el('div', { className: 'score' },
       el('div', { className: 'big' }, fmt(info.avg), el('small', { textContent: info.n ? `${info.n} rating${info.n > 1 ? 's' : ''}` : 'not rated yet' }),
         el('span', { className: 'dif', textContent: info.difficulty != null ? `${diffWord(info.difficulty)} · ${fmt(info.difficulty)}/5 difficulty` : 'No difficulty votes' })),
@@ -275,6 +281,20 @@ function offerLine(m) {
   return el('div', { className: 'offer' + (d ? ' stale' : '') },
     d ? `Not offered since ${o.last}. ` : '',
     `Ran in ${o.n} semester${o.n > 1 ? 's' : ''}, ${o.first} to ${o.last}.`);
+}
+
+// Exam outcomes from TUM Exam Stats. Facts about how a cohort actually did, cited and
+// linked. Deliberately separate from the student ratings: this is not an opinion and it
+// never feeds the stars or the student difficulty votes.
+function examLine(m) {
+  const e = EXAMS[m.code];
+  if (!e) return null;
+  const span = e.first === e.last ? e.first : `${e.first} to ${e.last}`;
+  return el('div', { className: 'exam' },
+    el('b', { textContent: `${e.fail}% failed` }),
+    ` across ${e.sat} candidates in ${e.sittings} sitting${e.sittings > 1 ? 's' : ''}, ${span}`,
+    e.avg ? `. Average grade ${e.avg}. ` : '. ',
+    el('a', { className: 'src', href: 'https://stats.aamin.dev', target: '_blank', rel: 'noopener' }, 'TUM Exam Stats'));
 }
 
 // Summaries of public discussion, in our own words, each linked to its source.

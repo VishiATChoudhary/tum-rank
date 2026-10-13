@@ -80,11 +80,16 @@ python3 scripts/build_static.py         # regenerate public/data and api/_keys.j
 | `IP_SALT` | Random secret used to hash IP addresses (raw IPs are never stored) |
 | `GH_TOKEN`, `GH_REPO` | Optional. Fine-grained token with Actions: write, so approving a degree starts the import |
 
-## Exam pass rates
+## Exam outcomes
 
-[stats.aamin.dev](https://stats.aamin.dev) publishes TUM exam statistics (registrations,
-attempts, no-shows, pass rates) per module per semester. Each course links out to it. We do
-not copy it: it is someone else's database, and their search backend is currently offline.
-Worth approaching the author about combining forces.
+[TUM Exam Stats](https://stats.aamin.dev) publishes TUM exam statistics per module per sitting.
+`scripts/fetch_exams.py` parses the figures their front page serves and `scripts/build_exams.py`
+reduces them to a weighted failure rate, candidate count and average grade per module:
+**103 modules covered**. Every figure is credited to them with a link back, and the
+"Hardest exam" ordering is built from it.
+
+These are exam facts, not ratings. They never touch the stars, the student difficulty votes
+or the "Top rated" ordering. If the author objects, delete `data/vendor/exam_stats.json`,
+re-run `build_exams.py`, and it is gone. Draft note to them: `docs/exam-stats-author.md`.
 
 See [SECURITY.md](SECURITY.md) for the abuse model.
